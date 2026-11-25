@@ -1,114 +1,50 @@
+/** @format */
 import { MCPServer } from "mcp-use";
-import { z } from "zod";
+import { AppInputType } from "./src/schemas/main.schema.js";
+import { GithubOverviewOutputSchema } from "./src/schemas/github_repo_overview.schema.js";
+import { fetchGithubOverviewDetails } from "./src/tools/github_repo_overview.tool.js";
 
+// Initialize MCP server
 const server = new MCPServer({
   name: "mcp_github_app_2026",
-  title: "mcp_github_app_2026", 
+  title: "mcp_github_app_2026",
   version: "1.0.0",
   description: "an mcp-use app",
-  instructions: "use show-app to open the app view", // Model-facing guidance — surfaced to the LLM by compatible clients.
-  websiteUrl: "https://mcp-use.com",
-  // Icons for your MCP Server, from public/ (or absolute URLs).
-  icons: [
-    {
-      src: "icon.svg",
-      mimeType: "image/svg+xml",
-      sizes: ["512x512"],
-    },
-  ],
-
-  // The MCP server is by default served at /mcp, to customise
-  // basePath: "/mcp",
-
-  // mcp-use has 1 line adapter for OAuth, import from mcp-use/oauth/*
-  // oauth: oauthClerkProvider(), // zero-config via MCP_USE_OAUTH_CLERK_FRONTEND_API_URL, import from mcp-use/oauth/*
-
-  // When OAuth is on, the HTML landing page (/mcp) is protected by default, set to true to keep the landing page public while /mcp stays bearer-protected.
-  // publicLandingPage: true,
+  instructions: `You are a GitHub repository assistant. You have access to the following tools:
+    1. get-repository-overview:
+       Get repository details such as name, description, stars, forks, language, and open issues count.
+    2. get-repository-open-issues:
+       Fetch all open issues of a GitHub repository.
+    3. get-repository-contributors:
+       Fetch contributors of a GitHub repository.
+    4. get-repository-pull-requests:
+       Fetch open pull requests of a GitHub repository.
+    Always ask for the repository owner and repository name if they are not provided.
+    Select the appropriate tool based on the user's request.
+  `,
 });
 
-// TOOLS
-
-// tool inputs are zod schemas. Important: set decriptions for the model to understand the input.
-const showAppInputSchema = z.object({
-  appName: z
-    .string()
-    .optional()
-    .describe(
-      "Optional title shown in the MCP App card instead of the default"
-    ),
-});
-
-// tool outputs are zod schemas. Important: set descriptions for the model to understand the output.
-const showAppOutputSchema = z.object({
-  message: z.string().describe("Message to display in the MCP App"),
-});
-
-export const showApp = server.tool(
+// Register github overview tool with MCP server
+export const GithubOverviewTool = server.tool(
   {
-    name: "show-app", // Unique tool id on the wire.
-    title: "Show MCP App", // Short label in inspector and client UIs (falls back to name).
-    description: "Display the MCP App starter view", // LLM-facing summary of what the tool does.
-    inputSchema: showAppInputSchema, // Validated before the handler runs; .describe() text becomes LLM hints.
-    outputSchema: showAppOutputSchema, // Required when binding a view — the view reads structuredContent typed by this.
+    name: "get-repository-overview",
+    title: "get-repository-overview",
+    description:
+      "Call get-repository-overview to get github repository overview",
+    inputSchema: AppInputType,
+    outputSchema: GithubOverviewOutputSchema,
     view: {
-      name: "my-view", // directory under views/
-      description: "MCP App starter card with interactive demo hooks",
-      prefersBorder: false, // ask the host to skip a card border around the view
-      csp: {
-        resourceDomains: [
-          "https://fonts.googleapis.com",
-          "https://fonts.gstatic.com",
-        ],
-      },
-    },
-    // Behavioral hints for clients (readOnly / destructive / open-world).
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
+      name: "repos",
     },
   },
-  async ({ appName }, ctx) => {
-    // Brief delay so the pending skeleton is visible during dev/inspector demos.
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    console.log(`The app name was: ${appName}`);
-    const data = { message: `The MCP App starter for ${appName} is ready!` };
+  async ({ owner, repo }) => {
+    const data = await fetchGithubOverviewDetails(owner, repo);
+    const description = data.description || "No description found";
+    const language = data.language || "No language found";
+    const summary = `Name of the repo ${data.name} and description of the repo ${description} and language: ${language}, total number of star: ${data.stargazers_count}, total number of open issues: ${data.open_issues_count}, total number of forks: ${data.forks_count} and repo's html url: ${data.html_url}`;
 
     return {
-      content: [{ type: "text", text: data.message }],
-      structuredContent: data,
-    };
-  }
-);
-
-// say-hello — plain tool (no view); used by the Say Hello button in my-view
-const sayHelloInputSchema = z.object({
-  name: z.string().describe("Name to greet"),
-});
-
-const sayHelloOutputSchema = z.object({
-  greeting: z.string().describe("Greeting to display"),
-});
-
-export const sayHello = server.tool(
-  {
-    name: "say-hello",
-    title: "Say hello",
-    description: "Returns a greeting for the Say Hello button demo",
-    inputSchema: sayHelloInputSchema,
-    outputSchema: sayHelloOutputSchema,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      openWorldHint: false,
-    },
-  },
-  async ({ name }) => {
-    const data = { greeting: `Hello, ${name}!` };
-    return {
-      content: [{ type: "text", text: data.greeting }],
+      content: [{ type: "text", text: summary }],
       structuredContent: data,
     };
   }
