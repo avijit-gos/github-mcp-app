@@ -16,6 +16,7 @@
   "include": [
     "index.ts",
     "src/tools/github_repo_overview.tool.ts",
+    "src/tools/github_repo_open_issues.tool.ts",
     "**/landing.tsx",
     "mcp-env.d.ts",
     "src/**/*",
