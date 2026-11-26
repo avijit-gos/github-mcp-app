@@ -3,6 +3,8 @@ import { MCPServer } from "mcp-use";
 import { AppInputType } from "./src/schemas/main.schema.js";
 import { GithubOverviewOutputSchema } from "./src/schemas/github_repo_overview.schema.js";
 import { fetchGithubOverviewDetails } from "./src/tools/github_repo_overview.tool.js";
+import { fetchGithubOpenIssueTool } from "./src/tools/github_repo_open_issues.tool.js";
+import { GithubOpenIssuesResponseSchema } from "./src/schemas/github_repo_open_issues.schema.js";
 
 // Initialize MCP server
 const server = new MCPServer({
@@ -46,6 +48,49 @@ export const GithubOverviewTool = server.tool(
     return {
       content: [{ type: "text", text: summary }],
       structuredContent: data,
+    };
+  }
+);
+
+// Register github open issue tool with MCP server
+export const GithubOpenIssueTool = server.tool(
+  {
+    name: "get-repository-open-issues",
+    title: "get-repository-open-issues",
+    description: "This tool used to fetch details of github repo open issue",
+    inputSchema: AppInputType,
+    outputSchema: GithubOpenIssuesResponseSchema,
+    view: {
+      name: "issues",
+    },
+  },
+  async ({ owner, repo }) => {
+    const data = await fetchGithubOpenIssueTool(owner, repo);
+    const summary = `
+Found ${data.length} open issues in the repository ${owner}/${repo}.
+${data
+  .map(
+    (issue, index) => `Issue ${index + 1}:
+      - Issue Number: #${issue.number}
+      - Title: ${issue.title}
+      - Description: ${issue.body ?? "No description available"}
+      - State: ${issue.state}
+      - Created By: ${issue.user.login}
+      - Labels: ${
+        issue.labels.map((label) => label.name).join(", ") || "No labels"
+      }
+      - Total Comments: ${issue.comments}
+      - Created At: ${issue.created_at}
+      - Last Updated: ${issue.updated_at}
+      - Issue URL: ${issue.html_url}`
+  )
+  .join("\n")}
+`;
+    return {
+      content: [{ type: "text", text: summary }],
+      structuredContent: {
+        issues: data,
+      },
     };
   }
 );
