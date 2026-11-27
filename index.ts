@@ -5,6 +5,8 @@ import { GithubOverviewOutputSchema } from "./src/schemas/github_repo_overview.s
 import { fetchGithubOverviewDetails } from "./src/tools/github_repo_overview.tool.js";
 import { fetchGithubOpenIssueTool } from "./src/tools/github_repo_open_issues.tool.js";
 import { GithubOpenIssuesResponseSchema } from "./src/schemas/github_repo_open_issues.schema.js";
+import { fetchGithubContributors } from "./src/tools/github_repo_contributor.tool.js";
+import { GithubRepoContributorsResponseSchema } from "./src/schemas/github_repo_contributor.schema.js";
 
 // Initialize MCP server
 const server = new MCPServer({
@@ -90,6 +92,46 @@ ${data
       content: [{ type: "text", text: summary }],
       structuredContent: {
         issues: data,
+      },
+    };
+  }
+);
+
+// Register github contributors tool with MCP server
+export const GithubRepoContributorTool = server.tool(
+  {
+    name: "get-repository-contributors",
+    title: "get-repository-contributors",
+    description: "This tool used to fetch github repository contributors list",
+    inputSchema: AppInputType,
+    outputSchema: GithubRepoContributorsResponseSchema,
+    view: {
+      name: "contributors",
+    },
+  },
+  async ({ owner, repo }) => {
+    const data = await fetchGithubContributors(owner, repo);
+    const summary = `
+Found ${data.length} contributors in the repository ${owner}/${repo}.
+
+${data
+  .map(
+    (contributor, index) => `Contributor ${index + 1}:
+      - Username: ${contributor.login}
+      - GitHub ID: ${contributor.id}
+      - Profile URL: ${contributor.html_url}
+      - Avatar URL: ${contributor.avatar_url}
+      - Account Type: ${contributor.type}
+      - Site Admin: ${contributor.site_admin ? "Yes" : "No"}
+      - Total Contributions: ${contributor.contributions}`
+  )
+  .join("\n\n")}
+`;
+
+    return {
+      content: [{ type: "text", text: summary }],
+      structuredContent: {
+        contributors: data,
       },
     };
   }
